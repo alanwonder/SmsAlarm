@@ -1,4 +1,4 @@
-package com.example.smsalarm
+package com.example.smsalarm/*package com.example.smsalarm
 
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -23,3 +23,4 @@ class SmsReceiver : BroadcastReceiver() {
         }
     }
 }
+*/
