@@ -3,26 +3,26 @@ package com.example.smsalarm
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import android.content.Intent
-import android.os.Build
 import androidx.core.content.ContextCompat
 
 class SmsNotificationListener : NotificationListenerService() {
 
-    private val keywords = listOf("交通提示") // 可以扩展多个关键词
-
     override fun onNotificationPosted(sbn: StatusBarNotification) {
-        val notification = sbn.notification
-        val extras = notification.extras
+        val pkg = sbn.packageName
 
-        val title = extras.getString("android.title") ?: ""
-        val text = extras.getCharSequence("android.text")?.toString() ?: ""
+        // 系统短信包名（不同ROM可能不同）
+        if (pkg == "com.google.android.apps.messaging"
+            || pkg == "com.android.mms"
+            || pkg.contains("sms")) {
 
-        val content = "$title $text"
+            val extras = sbn.notification.extras
+            val text = extras.getCharSequence("android.text")?.toString() ?: return
 
-        if (keywords.any { content.contains(it) }) {
-            // 启动前台服务播放铃声
-            val serviceIntent = Intent(this, AlarmService::class.java)
-            ContextCompat.startForegroundService(this, serviceIntent)
+            if (text.contains("上海交警")) {
+                val intent = Intent(this, AlarmService::class.java)
+                startForegroundService(intent)
+            }
         }
     }
 }
+
