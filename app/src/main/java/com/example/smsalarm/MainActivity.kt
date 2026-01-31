@@ -32,5 +32,9 @@ class MainActivity : AppCompatActivity() {
                 1001
             )
         }
+        /*getSharedPreferences("init", MODE_PRIVATE)
+            .edit {
+                putBoolean("activated", true)
+            }*/
     }
 }
