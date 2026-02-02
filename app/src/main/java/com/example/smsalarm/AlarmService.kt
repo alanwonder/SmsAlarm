@@ -116,10 +116,15 @@ class AlarmService : Service() {
     }
 
     override fun onDestroy() {
-        // 兜底，防止异常销毁
-        stopAlarm()
+        handler.removeCallbacksAndMessages(null)
+
+        mediaPlayer?.stop()
+        mediaPlayer?.release()
+        mediaPlayer = null
+
         super.onDestroy()
     }
+
 
     override fun onBind(intent: Intent?): IBinder? = null
 }

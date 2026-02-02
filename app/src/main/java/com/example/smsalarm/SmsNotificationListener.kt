@@ -12,10 +12,11 @@ class SmsNotificationListener : NotificationListenerService() {
     companion object {
         private const val SP_NAME = "alarm"
         private const val KEY_LAST_TRIGGER = "last_trigger"
-        private const val DEBOUNCE_INTERVAL = 15 * 60 * 1000L // 15分钟
+        private const val DEBOUNCE_INTERVAL = 5 * 60 * 1000L // 15分钟
     }
 
     override fun onNotificationPosted(sbn: StatusBarNotification) {
+        if (!MonitorConfig.isEnabled(this)) return
 
         val pkg = sbn.packageName
         if (!isSmsPackage(pkg)) return
@@ -23,7 +24,9 @@ class SmsNotificationListener : NotificationListenerService() {
         if (!isNewNotification(sbn)) return
 
         val extras = sbn.notification.extras
-        val text = extras.getCharSequence("android.text")?.toString() ?: return
+        val text = extras.getCharSequence("android.text")
+            ?: extras.getCharSequence("android.bigText")
+            ?: return
 
         if (!text.contains("上海交警")) return
 
@@ -49,15 +52,15 @@ class SmsNotificationListener : NotificationListenerService() {
 
     private fun isNewNotification(sbn: StatusBarNotification): Boolean {
         val sp = getSharedPreferences("alarm", MODE_PRIVATE)
-        val key = "last_sbn_id"
 
-        val lastId = sp.getInt(key, -1)
-        val currentId = sbn.id
+        val lastKey = sp.getString("last_key", null)
+        val currentKey = "${sbn.id}_${sbn.postTime}"
 
-        if (currentId == lastId) return false
+        if (currentKey == lastKey) return false
 
-        sp.edit().putInt(key, currentId).apply()
+        sp.edit { putString("last_key", currentKey) }
         return true
     }
+
 
 }
