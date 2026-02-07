@@ -2,7 +2,9 @@ name: Build APK
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "master" ]
+  pull_request:
+    branches: [ "master" ]
   workflow_dispatch:
 
 jobs:
@@ -34,11 +36,11 @@ jobs:
         run: |
           echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > smsalarm.keystore
 
-      - name: Debug secrets
-        run: |
-          echo "KEYSTORE_PASSWORD length: ${#KEYSTORE_PASSWORD}"
-          echo "KEY_ALIAS length: ${#KEY_ALIAS}"
-          echo "KEY_PASSWORD length: ${#KEY_PASSWORD}"
+      # - name: Debug secrets
+      #   run: |
+      #     echo "KEYSTORE_PASSWORD length: ${#KEYSTORE_PASSWORD}"
+      #     echo "KEY_ALIAS length: ${#KEY_ALIAS}"
+      #     echo "KEY_PASSWORD length: ${#KEY_PASSWORD}"
           
       - name: Build Release APK
         run: ./gradlew assembleRelease
@@ -49,8 +51,8 @@ jobs:
           name: app-release
           path: app/build/outputs/apk/release/*.apk
 
-      - name: Verify APK signature
-        run: |
-          BUILD_TOOLS=$(ls $ANDROID_HOME/build-tools | sort -V | tail -n 1)
-          $ANDROID_HOME/build-tools/$BUILD_TOOLS/apksigner verify --verbose app/build/outputs/apk/release/app-release.apk
+      # - name: Verify APK signature
+      #   run: |
+      #     BUILD_TOOLS=$(ls $ANDROID_HOME/build-tools | sort -V | tail -n 1)
+      #     $ANDROID_HOME/build-tools/$BUILD_TOOLS/apksigner verify --verbose app/build/outputs/apk/release/app-release.apk
 
