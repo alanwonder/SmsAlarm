@@ -29,6 +29,13 @@ class MainActivity : AppCompatActivity() {
         val btnToggle = findViewById<Button>(R.id.btnToggle)
         updateText(btnToggle)
 
+        if (MonitorConfig.isEnabled(this)) {
+            ContextCompat.startForegroundService(
+                this,
+                Intent(this, KeepAliveService::class.java)
+            )
+        }
+
         btnToggle.setOnClickListener {
 
             // ① 未开启通知监听 → 引导一次
@@ -49,6 +56,15 @@ class MainActivity : AppCompatActivity() {
             val enabled = !MonitorConfig.isEnabled(this)
             MonitorConfig.setEnabled(this, enabled)
             updateText(btnToggle)
+
+            if (enabled) {
+                ContextCompat.startForegroundService(
+                    this,
+                    Intent(this, KeepAliveService::class.java)
+                )
+            } else {
+                stopService(Intent(this, KeepAliveService::class.java))
+            }
 
             Toast.makeText(
                 this,
