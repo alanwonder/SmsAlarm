@@ -30,17 +30,18 @@ class KeepAliveService : Service() {
         val channel = NotificationChannel(
             CHANNEL_ID,
             "后台守护",
-            NotificationManager.IMPORTANCE_MIN
+            NotificationManager.IMPORTANCE_LOW
         )
         val manager = getSystemService(NotificationManager::class.java)
         manager.createNotificationChannel(channel)
 
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("短信监控运行中")
-            .setContentText("用于保持后台运行")
+            .setContentText("用于接收交通提示短信")
             .setSmallIcon(android.R.drawable.ic_menu_info_details)
             .setOngoing(true)
-            .setPriority(NotificationCompat.PRIORITY_MIN)
+            .setAutoCancel(false)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
             .build()
     }
 }
