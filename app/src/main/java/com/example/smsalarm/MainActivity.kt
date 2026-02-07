@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.ComponentName
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import android.widget.Button
@@ -30,10 +31,7 @@ class MainActivity : AppCompatActivity() {
         updateText(btnToggle)
 
         if (MonitorConfig.isEnabled(this)) {
-            ContextCompat.startForegroundService(
-                this,
-                Intent(this, KeepAliveService::class.java)
-            )
+            startKeepAliveIfAllowed()
         }
 
         btnToggle.setOnClickListener {
@@ -58,10 +56,16 @@ class MainActivity : AppCompatActivity() {
             updateText(btnToggle)
 
             if (enabled) {
-                ContextCompat.startForegroundService(
-                    this,
-                    Intent(this, KeepAliveService::class.java)
-                )
+                if (!canPostNotifications()) {
+                    requestRuntimePermissions()
+                    Toast.makeText(
+                        this,
+                        "请授予通知权限以保持后台监控",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                } else {
+                    startKeepAliveIfAllowed()
+                }
             } else {
                 stopService(Intent(this, KeepAliveService::class.java))
             }
@@ -71,6 +75,17 @@ class MainActivity : AppCompatActivity() {
                 if (enabled) "监控已启用" else "监控已停止",
                 Toast.LENGTH_SHORT
             ).show()
+        }
+    }
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == 1001 && MonitorConfig.isEnabled(this) && canPostNotifications()) {
+            startKeepAliveIfAllowed()
         }
     }
 
@@ -108,6 +123,27 @@ class MainActivity : AppCompatActivity() {
         return enabledListeners.contains(cn.flattenToString())
     }
 
+
+    private fun canPostNotifications(): Boolean {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.POST_NOTIFICATIONS
+            ) == PackageManager.PERMISSION_GRANTED
+        } else {
+            true
+        }
+    }
+
+    private fun startKeepAliveIfAllowed() {
+        if (!canPostNotifications()) {
+            return
+        }
+        ContextCompat.startForegroundService(
+            this,
+            Intent(this, KeepAliveService::class.java)
+        )
+    }
 
     private fun updateText(btn: Button) {
         btn.text = if (MonitorConfig.isEnabled(this)) {
