@@ -29,6 +29,12 @@ jobs:
         run: |
           echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > smsalarm.keystore
 
+      - name: Debug secrets
+        run: |
+          echo "KEYSTORE_PASSWORD length: ${#KEYSTORE_PASSWORD}"
+          echo "KEY_ALIAS length: ${#KEY_ALIAS}"
+          echo "KEY_PASSWORD length: ${#KEY_PASSWORD}"
+          
       - name: Build Release APK
         run: ./gradlew assembleRelease
 
