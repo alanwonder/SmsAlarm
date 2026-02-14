@@ -3,8 +3,11 @@ package com.example.smsalarm
 import android.app.*
 import android.content.Context
 import android.content.Intent
+import android.media.AudioAttributes
+import android.media.AudioFocusRequest
 import android.media.AudioManager
 import android.media.MediaPlayer
+import android.os.Build
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
@@ -19,6 +22,7 @@ class AlarmService : Service() {
     }
 
     private var mediaPlayer: MediaPlayer? = null
+    private var audioFocusRequest: AudioFocusRequest? = null
     private val playDuration = 10 * 60 * 1000L // 10分钟
     private val handler = Handler(Looper.getMainLooper())
 
@@ -47,7 +51,14 @@ class AlarmService : Service() {
 
     private fun playSound() {
         if (mediaPlayer == null) {
-            mediaPlayer = MediaPlayer.create(this, R.raw.alarm)
+            val audioAttributes = AudioAttributes.Builder()
+                .setUsage(AudioAttributes.USAGE_ALARM)
+                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                .build()
+
+            requestAlarmAudioFocus(audioAttributes)
+
+            mediaPlayer = MediaPlayer.create(this, R.raw.alarm, audioAttributes, 0)
             mediaPlayer?.isLooping = true
             mediaPlayer?.start()
         }
@@ -55,11 +66,34 @@ class AlarmService : Service() {
 
     private fun setVolumeMax() {
         val audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+        val alarmMaxVolume = audioManager.getStreamMaxVolume(AudioManager.STREAM_ALARM)
+        audioManager.setStreamVolume(AudioManager.STREAM_ALARM, alarmMaxVolume, 0)
+
+        // 兼容部分 ROM：MediaPlayer 默认可能仍走音乐流，双保险拉满。
+        val musicMaxVolume = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
         audioManager.setStreamVolume(
             AudioManager.STREAM_MUSIC,
-            audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC),
+            musicMaxVolume,
             0
         )
+    }
+
+    private fun requestAlarmAudioFocus(audioAttributes: AudioAttributes) {
+        val audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            audioFocusRequest = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT)
+                .setAudioAttributes(audioAttributes)
+                .build()
+            audioManager.requestAudioFocus(audioFocusRequest!!)
+        } else {
+            @Suppress("DEPRECATION")
+            audioManager.requestAudioFocus(
+                null,
+                AudioManager.STREAM_ALARM,
+                AudioManager.AUDIOFOCUS_GAIN_TRANSIENT
+            )
+        }
     }
 
     /**
@@ -72,8 +106,22 @@ class AlarmService : Service() {
         mediaPlayer?.release()
         mediaPlayer = null
 
+        abandonAudioFocus()
+
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
+    }
+
+    private fun abandonAudioFocus() {
+        val audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            audioFocusRequest?.let { audioManager.abandonAudioFocusRequest(it) }
+            audioFocusRequest = null
+        } else {
+            @Suppress("DEPRECATION")
+            audioManager.abandonAudioFocus(null)
+        }
     }
 
     private fun createNotification() {
@@ -121,6 +169,7 @@ class AlarmService : Service() {
         mediaPlayer?.stop()
         mediaPlayer?.release()
         mediaPlayer = null
+        abandonAudioFocus()
 
         super.onDestroy()
     }
