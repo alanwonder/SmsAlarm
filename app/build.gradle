@@ -4,6 +4,17 @@ plugins {
 }
 
 def getGitCommitCount() {
+    def shallowCheckOutput = new ByteArrayOutputStream()
+    exec {
+        commandLine 'git', 'rev-parse', '--is-shallow-repository'
+        standardOutput = shallowCheckOutput
+    }
+
+    def isShallowRepo = shallowCheckOutput.toString().trim().equalsIgnoreCase('true')
+    if (isShallowRepo) {
+        throw new GradleException("Cannot derive versionCode from shallow Git history. Fetch full history (e.g. checkout with fetch-depth: 0).")
+    }
+
     def stdout = new ByteArrayOutputStream()
     exec {
         commandLine 'git', 'rev-list', '--count', 'HEAD'
