@@ -86,7 +86,3 @@ tasks.register("incrementVersionCode") {
         println("Current git commit count versionCode: ${gitCommitCount}")
     }
 }
-
-tasks.named("assembleRelease") {
-    dependsOn("incrementVersionCode")
-}
