@@ -4,6 +4,11 @@ SmsAlarm is an Android app that watches incoming **SMS-style notifications** and
 
 > Current detection rule: trigger when a new notification from an SMS app contains the text `上海交警`.
 
+## Documentation
+
+- Chinese full project documentation: `docs/项目文档.md`
+
+
 ## What the app does
 
 - Lets you toggle monitoring on/off from a single button in the main screen.
