@@ -25,6 +25,7 @@ class AlarmService : Service() {
     private var audioFocusRequest: AudioFocusRequest? = null
     private val playDuration = 10 * 60 * 1000L // 10分钟
     private val handler = Handler(Looper.getMainLooper())
+    private var isStopped = false
 
     override fun onCreate() {
         super.onCreate()
@@ -100,16 +101,25 @@ class AlarmService : Service() {
      * ★ 统一的停止逻辑（自动 / 手动 都走这里）
      */
     private fun stopAlarm() {
+        if (isStopped) {
+            return
+        }
+        isStopped = true
+
         handler.removeCallbacksAndMessages(null)
-
-        mediaPlayer?.stop()
-        mediaPlayer?.release()
-        mediaPlayer = null
-
+        releaseMediaPlayer()
         abandonAudioFocus()
 
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
+    }
+
+    private fun releaseMediaPlayer() {
+        mediaPlayer?.let {
+            runCatching { it.stop() }
+            it.release()
+        }
+        mediaPlayer = null
     }
 
     private fun abandonAudioFocus() {
@@ -165,10 +175,7 @@ class AlarmService : Service() {
 
     override fun onDestroy() {
         handler.removeCallbacksAndMessages(null)
-
-        mediaPlayer?.stop()
-        mediaPlayer?.release()
-        mediaPlayer = null
+        releaseMediaPlayer()
         abandonAudioFocus()
 
         super.onDestroy()
