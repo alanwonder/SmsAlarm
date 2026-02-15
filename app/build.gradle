@@ -1,26 +1,23 @@
 plugins {
     id 'com.android.application'
-    id 'org.jetbrains.kotlin.android'
+}
+
+if (!plugins.hasPlugin('org.jetbrains.kotlin.android') && extensions.findByName('kotlin') == null) {
+    apply plugin: 'org.jetbrains.kotlin.android'
 }
 
 def getGitCommitCount() {
-    def shallowCheckOutput = new ByteArrayOutputStream()
-    exec {
+    def isShallowRepo = providers.exec {
         commandLine 'git', 'rev-parse', '--is-shallow-repository'
-        standardOutput = shallowCheckOutput
-    }
+    }.standardOutput.asText.get().trim().equalsIgnoreCase('true')
 
-    def isShallowRepo = shallowCheckOutput.toString().trim().equalsIgnoreCase('true')
     if (isShallowRepo) {
         throw new GradleException("Cannot derive versionCode from shallow Git history. Fetch full history (e.g. checkout with fetch-depth: 0).")
     }
 
-    def stdout = new ByteArrayOutputStream()
-    exec {
+    return providers.exec {
         commandLine 'git', 'rev-list', '--count', 'HEAD'
-        standardOutput = stdout
-    }
-    return stdout.toString().trim().toInteger()
+    }.standardOutput.asText.get().trim().toInteger()
 }
 
 def gitCommitCount = getGitCommitCount()
@@ -28,16 +25,18 @@ def gitCommitCount = getGitCommitCount()
 dependencies {
     implementation 'androidx.core:core-ktx:1.12.0'
     implementation 'androidx.appcompat:appcompat:1.6.1'
+
+    testImplementation 'junit:junit:4.13.2'
 }
 
 android {
     namespace 'com.example.smsalarm'
-    compileSdk 34
+    compileSdk = 34
 
     defaultConfig {
         applicationId "com.example.smsalarm"
-        minSdk 29
-        targetSdk 34
+        minSdk = 29
+        targetSdk = 34
         versionCode gitCommitCount
         versionName "1.0"
     }
@@ -71,10 +70,6 @@ android {
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_11
         targetCompatibility JavaVersion.VERSION_11
-    }
-
-    kotlinOptions {
-        jvmTarget = '11'
     }
 }
 
