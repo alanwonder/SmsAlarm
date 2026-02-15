@@ -15,11 +15,15 @@ import androidx.core.content.ContextCompat
 
 class MainActivity : AppCompatActivity() {
 
-    private val smsPermissions = arrayOf(
-        Manifest.permission.POST_NOTIFICATIONS
-        //Manifest.permission.RECEIVE_SMS,
-        //Manifest.permission.READ_SMS
-    )
+    private val runtimePermissions by lazy {
+        buildList {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                add(Manifest.permission.POST_NOTIFICATIONS)
+            }
+            // add(Manifest.permission.RECEIVE_SMS)
+            // add(Manifest.permission.READ_SMS)
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -93,7 +97,11 @@ class MainActivity : AppCompatActivity() {
      * 运行时权限申请
      */
     private fun requestRuntimePermissions() {
-        val need = smsPermissions.filter { permission ->
+        if (runtimePermissions.isEmpty()) {
+            return
+        }
+
+        val need = runtimePermissions.filter { permission ->
             ContextCompat.checkSelfPermission(
                 this,
                 permission
