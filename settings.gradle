@@ -16,3 +16,31 @@ dependencyResolutionManagement {
 
 rootProject.name = "SmsAlarm"
 include(":app")
+
+def resolveAndroidSdkDir() {
+    def candidates = [
+            System.getenv("ANDROID_HOME"),
+            System.getenv("ANDROID_SDK_ROOT"),
+            "/workspace/android-sdk",
+            "${System.getProperty('user.home')}/Android/Sdk"
+    ]
+    return candidates.find { it && file(it).exists() }
+}
+
+def ensureLocalPropertiesWithSdkDir() {
+    def localPropertiesFile = file("local.properties")
+    if (localPropertiesFile.exists()) {
+        return
+    }
+
+    def sdkDir = resolveAndroidSdkDir()
+    if (!sdkDir) {
+        return
+    }
+
+    def escapedSdkDir = sdkDir.replace('\\', '\\\\')
+    localPropertiesFile.text = "sdk.dir=${escapedSdkDir}${System.lineSeparator()}"
+}
+
+ensureLocalPropertiesWithSdkDir()
+
