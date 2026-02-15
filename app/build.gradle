@@ -2,6 +2,10 @@ plugins {
     id 'com.android.application'
 }
 
+if (!plugins.hasPlugin('org.jetbrains.kotlin.android') && extensions.findByName('kotlin') == null) {
+    apply plugin: 'org.jetbrains.kotlin.android'
+}
+
 def getGitCommitCount() {
     def isShallowRepo = providers.exec {
         commandLine 'git', 'rev-parse', '--is-shallow-repository'
