@@ -23,7 +23,6 @@ class AlarmService : Service() {
 
     private var mediaPlayer: MediaPlayer? = null
     private var audioFocusRequest: AudioFocusRequest? = null
-    private val playDuration = 10 * 60 * 1000L // 10分钟
     private val handler = Handler(Looper.getMainLooper())
     private var isStopped = false
 
@@ -33,7 +32,7 @@ class AlarmService : Service() {
         setVolumeMax()
         playSound()
 
-        // 10分钟后自动停止
+        val playDuration = MonitorConfig.getRingDurationMinutes(this) * 60 * 1000L
         handler.postDelayed({
             stopAlarm()
         }, playDuration)
