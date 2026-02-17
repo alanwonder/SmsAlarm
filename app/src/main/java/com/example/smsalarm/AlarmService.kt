@@ -11,6 +11,9 @@ import android.os.Build
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.os.VibratorManager
 import androidx.core.app.NotificationCompat
 
 class AlarmService : Service() {
@@ -23,6 +26,7 @@ class AlarmService : Service() {
 
     private var mediaPlayer: MediaPlayer? = null
     private var audioFocusRequest: AudioFocusRequest? = null
+    private var vibrator: Vibrator? = null
     private val handler = Handler(Looper.getMainLooper())
     private var isStopped = false
 
@@ -31,6 +35,7 @@ class AlarmService : Service() {
         createNotification()
         setVolumeMax()
         playSound()
+        startVibration()
 
         val playDuration = MonitorConfig.getRingDurationMinutes(this) * 60 * 1000L
         handler.postDelayed({
@@ -62,6 +67,32 @@ class AlarmService : Service() {
             mediaPlayer?.isLooping = true
             mediaPlayer?.start()
         }
+    }
+
+    private fun startVibration() {
+        val systemVibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            val vm = getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as VibratorManager
+            vm.defaultVibrator
+        } else {
+            @Suppress("DEPRECATION")
+            getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
+        }
+
+        vibrator = systemVibrator
+        if (!systemVibrator.hasVibrator()) return
+
+        val pattern = longArrayOf(0, 700, 500)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            systemVibrator.vibrate(VibrationEffect.createWaveform(pattern, 0))
+        } else {
+            @Suppress("DEPRECATION")
+            systemVibrator.vibrate(pattern, 0)
+        }
+    }
+
+    private fun stopVibration() {
+        vibrator?.cancel()
+        vibrator = null
     }
 
     private fun setVolumeMax() {
@@ -108,6 +139,7 @@ class AlarmService : Service() {
         handler.removeCallbacksAndMessages(null)
         releaseMediaPlayer()
         abandonAudioFocus()
+        stopVibration()
 
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
@@ -176,6 +208,7 @@ class AlarmService : Service() {
         handler.removeCallbacksAndMessages(null)
         releaseMediaPlayer()
         abandonAudioFocus()
+        stopVibration()
 
         super.onDestroy()
     }
