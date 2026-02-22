@@ -12,7 +12,6 @@ class SmsNotificationListener : NotificationListenerService() {
     companion object {
         private const val SP_NAME = "alarm"
         private const val KEY_LAST_TRIGGER = "last_trigger"
-        private const val DEBOUNCE_INTERVAL = 5 * 60 * 1000L // 15分钟
     }
 
     override fun onNotificationPosted(sbn: StatusBarNotification) {
@@ -33,8 +32,9 @@ class SmsNotificationListener : NotificationListenerService() {
         val sp = getSharedPreferences(SP_NAME, Context.MODE_PRIVATE)
         val last = sp.getLong(KEY_LAST_TRIGGER, 0L)
         val now = System.currentTimeMillis()
+        val debounceInterval = MonitorConfig.getDebounceMinutes(this) * 60 * 1000L
 
-        if (now - last < DEBOUNCE_INTERVAL) {
+        if (now - last < debounceInterval) {
             return
         }
 

@@ -8,22 +8,34 @@ import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import android.widget.Button
+import android.widget.SeekBar
+import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.widget.SwitchCompat
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 
 class MainActivity : AppCompatActivity() {
+
+    companion object {
+        private const val REQUEST_PERMISSION_CODE = 1001
+        private const val MIN_DEBOUNCE_MINUTES = 1
+        private const val MAX_DEBOUNCE_MINUTES = 30
+        private const val MIN_RING_MINUTES = 1
+        private const val MAX_RING_MINUTES = 30
+    }
 
     private val runtimePermissions by lazy {
         buildList {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 add(Manifest.permission.POST_NOTIFICATIONS)
             }
-            // add(Manifest.permission.RECEIVE_SMS)
-            // add(Manifest.permission.READ_SMS)
         }
     }
+
+    private var pendingDebounceMinutes = MonitorConfig.DEFAULT_DEBOUNCE_MINUTES
+    private var pendingRingMinutes = MonitorConfig.DEFAULT_RING_DURATION_MINUTES
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -32,15 +44,67 @@ class MainActivity : AppCompatActivity() {
         requestRuntimePermissions()
 
         val btnToggle = findViewById<Button>(R.id.btnToggle)
+        val switchEditMode = findViewById<SwitchCompat>(R.id.switchEditMode)
+        val seekDebounce = findViewById<SeekBar>(R.id.seekDebounce)
+        val seekRingDuration = findViewById<SeekBar>(R.id.seekRingDuration)
+        val tvDebounceValue = findViewById<TextView>(R.id.tvDebounceValue)
+        val tvRingDurationValue = findViewById<TextView>(R.id.tvRingDurationValue)
+
         updateText(btnToggle)
+
+        pendingDebounceMinutes = MonitorConfig.getDebounceMinutes(this)
+        pendingRingMinutes = MonitorConfig.getRingDurationMinutes(this)
+
+        seekDebounce.max = MAX_DEBOUNCE_MINUTES - MIN_DEBOUNCE_MINUTES
+        seekRingDuration.max = MAX_RING_MINUTES - MIN_RING_MINUTES
+        seekDebounce.progress = pendingDebounceMinutes - MIN_DEBOUNCE_MINUTES
+        seekRingDuration.progress = pendingRingMinutes - MIN_RING_MINUTES
+
+        updateSliderValueText(tvDebounceValue, tvRingDurationValue)
+        setSliderEditable(false, seekDebounce, seekRingDuration)
+
+        seekDebounce.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+                pendingDebounceMinutes = MIN_DEBOUNCE_MINUTES + progress
+                updateSliderValueText(tvDebounceValue, tvRingDurationValue)
+            }
+
+            override fun onStartTrackingTouch(seekBar: SeekBar?) = Unit
+            override fun onStopTrackingTouch(seekBar: SeekBar?) = Unit
+        })
+
+        seekRingDuration.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+                pendingRingMinutes = MIN_RING_MINUTES + progress
+                updateSliderValueText(tvDebounceValue, tvRingDurationValue)
+            }
+
+            override fun onStartTrackingTouch(seekBar: SeekBar?) = Unit
+            override fun onStopTrackingTouch(seekBar: SeekBar?) = Unit
+        })
+
+        switchEditMode.setOnCheckedChangeListener { _, isChecked ->
+            if (isChecked) {
+                pendingDebounceMinutes = MonitorConfig.getDebounceMinutes(this)
+                pendingRingMinutes = MonitorConfig.getRingDurationMinutes(this)
+                seekDebounce.progress = pendingDebounceMinutes - MIN_DEBOUNCE_MINUTES
+                seekRingDuration.progress = pendingRingMinutes - MIN_RING_MINUTES
+                updateSliderValueText(tvDebounceValue, tvRingDurationValue)
+                setSliderEditable(true, seekDebounce, seekRingDuration)
+                Toast.makeText(this, "已进入编辑模式", Toast.LENGTH_SHORT).show()
+            } else {
+                MonitorConfig.setDebounceMinutes(this, pendingDebounceMinutes)
+                MonitorConfig.setRingDurationMinutes(this, pendingRingMinutes)
+                setSliderEditable(false, seekDebounce, seekRingDuration)
+                Toast.makeText(this, "参数已生效", Toast.LENGTH_SHORT).show()
+            }
+        }
 
         if (MonitorConfig.isEnabled(this)) {
             startKeepAliveIfAllowed()
         }
 
         btnToggle.setOnClickListener {
-
-            // ① 未开启通知监听 → 引导一次
             if (!hasNotificationListenerPermission()) {
                 Toast.makeText(
                     this,
@@ -54,7 +118,6 @@ class MainActivity : AppCompatActivity() {
                 return@setOnClickListener
             }
 
-            // ② 已授权 → 切换监控状态
             val enabled = !MonitorConfig.isEnabled(this)
             MonitorConfig.setEnabled(this, enabled)
             updateText(btnToggle)
@@ -88,14 +151,23 @@ class MainActivity : AppCompatActivity() {
         grantResults: IntArray
     ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (requestCode == 1001 && MonitorConfig.isEnabled(this) && canPostNotifications()) {
+        if (requestCode == REQUEST_PERMISSION_CODE && MonitorConfig.isEnabled(this) && canPostNotifications()) {
             startKeepAliveIfAllowed()
         }
     }
 
-    /**
-     * 运行时权限申请
-     */
+    private fun setSliderEditable(editable: Boolean, vararg seekBars: SeekBar) {
+        seekBars.forEach {
+            it.isEnabled = editable
+            it.isClickable = editable
+        }
+    }
+
+    private fun updateSliderValueText(tvDebounce: TextView, tvRingDuration: TextView) {
+        tvDebounce.text = "当前防抖阈值：${pendingDebounceMinutes} 分钟"
+        tvRingDuration.text = "当前响铃时长：${pendingRingMinutes} 分钟"
+    }
+
     private fun requestRuntimePermissions() {
         if (runtimePermissions.isEmpty()) {
             return
@@ -112,14 +184,11 @@ class MainActivity : AppCompatActivity() {
             ActivityCompat.requestPermissions(
                 this,
                 need.toTypedArray(),
-                1001
+                REQUEST_PERMISSION_CODE
             )
         }
     }
 
-    /**
-     * 判断是否已开启 NotificationListener 权限
-     */
     private fun hasNotificationListenerPermission(): Boolean {
         val cn = ComponentName(this, SmsNotificationListener::class.java)
 
@@ -130,7 +199,6 @@ class MainActivity : AppCompatActivity() {
 
         return enabledListeners.contains(cn.flattenToString())
     }
-
 
     private fun canPostNotifications(): Boolean {
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
