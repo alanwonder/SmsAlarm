@@ -65,10 +65,17 @@ jobs:
       - name: Build Release APK
         run: ./gradlew :app:incrementVersionCode :app:assembleRelease
 
+      # 用与 Gradle 相同的公式（git 提交数）生成唯一版本号，作为 artifact 名后缀。
+      - name: Compute APK version
+        run: |
+          VC=$(git rev-list --count HEAD)
+          echo "APK_VERSION=2.0.${VC}" >> "$GITHUB_ENV"
+          echo "APK_VERSION=2.0.${VC}"
+
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: app-release
+          name: app-release-${{ env.APK_VERSION }}
           path: app/build/outputs/apk/release/*.apk
 
       - name: Publish GitHub Release

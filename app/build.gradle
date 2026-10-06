@@ -84,6 +84,14 @@ android {
         }
     }
 
+    // APK 文件名带上唯一版本号：TP-Alert-2.0.<versionCode>.apk
+    // versionCode = git 提交数（每次构建唯一且递增），保证每次构建产物文件名不重名。
+    applicationVariants.all { variant ->
+        variant.outputs.all {
+            outputFileName = "TP-Alert-${variant.versionName}.${variant.versionCode}.apk"
+        }
+    }
+
     buildFeatures {
         compose false
     }
