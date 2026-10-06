@@ -32,15 +32,29 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
+      # android-actions/setup-android@v3 已损坏：它会安装已被 Google 移除的 legacy "tools" 包，
+      # 在新版 runner 上直接报 "Failed to find package 'tools'"（exit code 1）。
+      # ubuntu-latest 自带完整 Android SDK，这里改用自带 sdkmanager 显式安装构建所需包。
       - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+        run: |
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          if [ ! -f "$SDKMANAGER" ]; then
+            SDKMANAGER=$(ls "$ANDROID_HOME"/cmdline-tools/*/bin/sdkmanager 2>/dev/null | head -n1)
+          fi
+          yes | "$SDKMANAGER" --licenses >/dev/null 2>&1 || true
+          "$SDKMANAGER" "platforms;android-34" "build-tools;34.0.0" "platform-tools" >/dev/null
+          echo "sdk.dir=$ANDROID_HOME" >> local.properties
 
       - name: Grant execute permission
         run: chmod +x gradlew
 
       - name: Decode keystore
         run: |
-          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > smsalarm.keystore
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            echo "::warning::KEYSTORE_BASE64 secret 未配置，跳过解密（构建将生成未签名包）"
+          else
+            echo "$KEYSTORE_BASE64" | base64 -d > smsalarm.keystore
+          fi
 
       # - name: Debug secrets
       #   run: |
