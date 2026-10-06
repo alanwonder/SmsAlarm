@@ -146,7 +146,9 @@ Then build:
 
 If you find this project useful, consider buying me a coffee:
 
-- WeChat Pay 赞赏码: `<!-- TODO: 替换为赞赏码图片，如 docs/donate-wechat.png -->`
+- WeChat Pay 赞赏码:
+
+  ![WeChat 赞赏码](docs/donate-wechat.jpg)
 - Alipay 收款码: `<!-- TODO: 替换为收款码图片，如 docs/donate-alipay.png -->`
 - 爱发电 (Afdian): `<!-- TODO: https://afdian.com/a/<your-id> -->`
 - Buy Me a Coffee: `<!-- TODO: https://buymeacoffee.com/<your-id> -->`
