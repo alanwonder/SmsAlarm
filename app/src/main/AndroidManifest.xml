@@ -41,6 +41,12 @@
             </intent-filter>
         </receiver> -->
 
+        <!-- 精确闹钟中转：由 AlarmManager 触发，在前台豁免场景下拉起 AlarmService
+             （见 SmsNotificationListener.scheduleAlarm） -->
+        <receiver
+            android:name=".AlarmTriggerReceiver"
+            android:exported="false"/>
+
         <!-- 前台服务 -->
         <service
             android:name=".AlarmService"

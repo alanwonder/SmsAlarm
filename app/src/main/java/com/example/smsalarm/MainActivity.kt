@@ -124,12 +124,19 @@ class MainActivity : AppCompatActivity() {
 
             if (enabled) {
                 if (!canPostNotifications()) {
-                    requestRuntimePermissions()
-                    Toast.makeText(
-                        this,
-                        "请授予通知权限以保持后台监控",
-                        Toast.LENGTH_SHORT
-                    ).show()
+                    // 首次未决/可再请求：弹系统授权框。
+                    // 若已被永久拒绝（不再弹框），shouldShowRequestPermissionRationale 为 false，
+                    // 直接引导到系统通知设置页手动开启，而不是让用户卡在"无法弹框"的死角。
+                    if (shouldShowRequestPermissionRationale(Manifest.permission.POST_NOTIFICATIONS)) {
+                        requestRuntimePermissions()
+                        Toast.makeText(
+                            this,
+                            "请授予通知权限以保持后台监控",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    } else {
+                        openNotificationSettings()
+                    }
                 } else {
                     startKeepAliveIfAllowed()
                 }
@@ -145,6 +152,15 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    override fun onResume() {
+        super.onResume()
+        // 从系统通知设置返回（或 Activity 重建）时，若已开启监控且通知权限已就绪，
+        // 补齐保活前台服务。对已运行的服务再次 startForegroundService 是幂等的，无副作用。
+        if (MonitorConfig.isEnabled(this) && canPostNotifications()) {
+            startKeepAliveIfAllowed()
+        }
+    }
+
     override fun onRequestPermissionsResult(
         requestCode: Int,
         permissions: Array<out String>,
@@ -154,6 +170,17 @@ class MainActivity : AppCompatActivity() {
         if (requestCode == REQUEST_PERMISSION_CODE && MonitorConfig.isEnabled(this) && canPostNotifications()) {
             startKeepAliveIfAllowed()
         }
+    }
+
+    private fun openNotificationSettings() {
+        val intent = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+            .putExtra(Settings.EXTRA_APP_PACKAGE, packageName)
+        startActivity(intent)
+        Toast.makeText(
+            this,
+            "通知权限被永久拒绝，请在系统设置中手动开启",
+            Toast.LENGTH_LONG
+        ).show()
     }
 
     private fun setSliderEditable(editable: Boolean, vararg seekBars: SeekBar) {

@@ -30,10 +30,13 @@ class AlarmService : Service() {
     private val handler = Handler(Looper.getMainLooper())
     private var isStopped = false
 
+    // 报警前闹钟流的音量，用于报警结束后还原，避免永久把用户音量顶到最大。
+    private var originalAlarmVolume = -1
+
     override fun onCreate() {
         super.onCreate()
         createNotification()
-        setVolumeMax()
+        raiseAlarmVolume()
         playSound()
         startVibration()
 
@@ -95,18 +98,23 @@ class AlarmService : Service() {
         vibrator = null
     }
 
-    private fun setVolumeMax() {
+    /**
+     * 只抬升闹钟流音量（MediaPlayer 使用 USAGE_ALARM，本就走 STREAM_ALARM），
+     * 不再动音乐流——避免破坏用户正在收听的媒体音量，并在结束后还原原值。
+     */
+    private fun raiseAlarmVolume() {
         val audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
-        val alarmMaxVolume = audioManager.getStreamMaxVolume(AudioManager.STREAM_ALARM)
-        audioManager.setStreamVolume(AudioManager.STREAM_ALARM, alarmMaxVolume, 0)
+        originalAlarmVolume = audioManager.getStreamVolume(AudioManager.STREAM_ALARM)
+        val max = audioManager.getStreamMaxVolume(AudioManager.STREAM_ALARM)
+        audioManager.setStreamVolume(AudioManager.STREAM_ALARM, max, 0)
+    }
 
-        // 兼容部分 ROM：MediaPlayer 默认可能仍走音乐流，双保险拉满。
-        val musicMaxVolume = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
-        audioManager.setStreamVolume(
-            AudioManager.STREAM_MUSIC,
-            musicMaxVolume,
-            0
-        )
+    private fun restoreAlarmVolume() {
+        if (originalAlarmVolume >= 0) {
+            val audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+            audioManager.setStreamVolume(AudioManager.STREAM_ALARM, originalAlarmVolume, 0)
+            originalAlarmVolume = -1
+        }
     }
 
     private fun requestAlarmAudioFocus(audioAttributes: AudioAttributes) {
@@ -140,6 +148,7 @@ class AlarmService : Service() {
         releaseMediaPlayer()
         abandonAudioFocus()
         stopVibration()
+        restoreAlarmVolume()
 
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
@@ -209,6 +218,7 @@ class AlarmService : Service() {
         releaseMediaPlayer()
         abandonAudioFocus()
         stopVibration()
+        restoreAlarmVolume()
 
         super.onDestroy()
     }

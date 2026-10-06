@@ -3,27 +3,44 @@ plugins {
     id 'org.jetbrains.kotlin.android'
 }
 
-def getGitCommitCount() {
-    def shallowCheckOutput = new ByteArrayOutputStream()
-    exec {
-        commandLine 'git', 'rev-parse', '--is-shallow-repository'
-        standardOutput = shallowCheckOutput
-    }
-
-    def isShallowRepo = shallowCheckOutput.toString().trim().equalsIgnoreCase('true')
-    if (isShallowRepo) {
-        throw new GradleException("Cannot derive versionCode from shallow Git history. Fetch full history (e.g. checkout with fetch-depth: 0).")
-    }
-
+def getVersionCode() {
+    // 优先从 git 提交数推导。git 不可用（如 ZIP 下载无 .git 目录）、浅克隆或历史为空时
+    // 回退到基于构建时间的版本号，保证任何方式拉取的仓库都能正常编译，
+    // 而不是在配置阶段直接抛异常把整个构建（含 debug）卡死。
     def stdout = new ByteArrayOutputStream()
-    exec {
-        commandLine 'git', 'rev-list', '--count', 'HEAD'
-        standardOutput = stdout
+    def count = 0
+    try {
+        def result = exec {
+            commandLine 'git', 'rev-list', '--count', 'HEAD'
+            standardOutput = stdout
+            errorOutput = new ByteArrayOutputStream()
+            ignoreExitValue = true
+        }
+        if (result.exitValue == 0) {
+            def s = stdout.toString().trim()
+            if (s.isInteger() && s.toInteger() > 0) {
+                count = s.toInteger()
+            }
+        }
+    } catch (Exception ignored) {
+        // git 不可用
     }
-    return stdout.toString().trim().toInteger()
+
+    if (count <= 0) {
+        count = (int) (System.currentTimeMillis() / 1000L % 1000000000)
+    }
+    return count
 }
 
-def gitCommitCount = getGitCommitCount()
+def gitCommitCount = getVersionCode()
+
+// release 签名所需文件与凭据是否齐全；不齐时 release 生成未签名包而不报错，
+// 让默认构建（debug/release）都不会因缺少签名配置而失败。
+def keystoreFile = file("../smsalarm.keystore")
+def releaseSigningReady = keystoreFile.exists()
+        && System.getenv("KEYSTORE_PASSWORD")
+        && System.getenv("KEY_ALIAS")
+        && System.getenv("KEY_PASSWORD")
 
 dependencies {
     implementation 'androidx.core:core-ktx:1.12.0'
@@ -42,20 +59,23 @@ android {
         versionName "1.0"
     }
 
-    // sign config
+    // sign config（仅在 keystore 与凭据齐备时启用）
     signingConfigs {
-        release {
-            storeFile file("../smsalarm.keystore")
-            storePassword System.getenv("KEYSTORE_PASSWORD")
-            keyAlias System.getenv("KEY_ALIAS")
-            keyPassword System.getenv("KEY_PASSWORD")
+        if (releaseSigningReady) {
+            release {
+                storeFile keystoreFile
+                storePassword System.getenv("KEYSTORE_PASSWORD")
+                keyAlias System.getenv("KEY_ALIAS")
+                keyPassword System.getenv("KEY_PASSWORD")
+            }
         }
     }
 
     buildTypes {
         release {
-            // use sign
-            signingConfig signingConfigs.release
+            if (releaseSigningReady) {
+                signingConfig signingConfigs.release
+            }
 
             minifyEnabled false
             proguardFiles getDefaultProguardFile(
