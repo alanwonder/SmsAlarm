@@ -56,7 +56,7 @@ android {
         minSdk 29
         targetSdk 34
         versionCode gitCommitCount
-        versionName "1.0"
+        versionName "2.0"
     }
 
     // sign config（仅在 keystore 与凭据齐备时启用）

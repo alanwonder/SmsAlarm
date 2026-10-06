@@ -17,7 +17,7 @@
 
     <application
         android:allowBackup="true"
-        android:label="SMS Alarm"
+        android:label="@string/app_name"
         android:icon="@mipmap/ic_launcher"
         android:theme="@style/Theme.AppCompat.Light.NoActionBar">
 
