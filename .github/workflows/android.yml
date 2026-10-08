@@ -73,7 +73,7 @@ jobs:
           echo "APK_VERSION=2.0.${VC}"
 
       - name: Upload APK
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: app-release-${{ env.APK_VERSION }}
           path: app/build/outputs/apk/release/*.apk
