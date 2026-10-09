@@ -54,6 +54,17 @@ class AlarmService : Service() {
             stopAlarm()
             return START_NOT_STICKY
         }
+
+        // 报警链路计时：onCreate 里已经开始出声，此处时间戳与实际出声相差毫秒级。
+        val tReceive = intent?.getLongExtra(AlarmTriggerReceiver.EXTRA_T_RECEIVE, -1L) ?: -1L
+        val tTrigger = intent?.getLongExtra(AlarmTriggerReceiver.EXTRA_T_TRIGGER, -1L) ?: -1L
+        val now = System.currentTimeMillis()
+        val note = buildString {
+            if (tTrigger > 0) append("from_trigger=${now - tTrigger}ms;")
+            if (tReceive > 0) append("from_receive=${now - tReceive}ms;")
+        }
+        TriggerLogger.log(this, "play", note.ifEmpty { "timing=unknown" })
+
         return START_NOT_STICKY
     }
 
