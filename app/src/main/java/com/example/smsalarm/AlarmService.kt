@@ -11,6 +11,7 @@ import android.os.Build
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
+import android.os.SystemClock
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
@@ -58,9 +59,10 @@ class AlarmService : Service() {
         }
 
         // 报警链路计时：首次启动时 onCreate 里已经开始出声，此处时间戳与实际出声相差毫秒级。
+        // 计时用单调时钟（elapsedRealtime），与上游 extra 同源，避免墙钟跳变。
         val tReceive = intent?.getLongExtra(AlarmTriggerReceiver.EXTRA_T_RECEIVE, -1L) ?: -1L
         val tTrigger = intent?.getLongExtra(AlarmTriggerReceiver.EXTRA_T_TRIGGER, -1L) ?: -1L
-        val now = System.currentTimeMillis()
+        val now = SystemClock.elapsedRealtime()
         val note = buildString {
             if (tTrigger > 0) append("from_trigger=${now - tTrigger}ms;")
             if (tReceive > 0) append("from_receive=${now - tReceive}ms;")

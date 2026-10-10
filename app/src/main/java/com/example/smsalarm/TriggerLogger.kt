@@ -7,8 +7,7 @@ import java.io.FileWriter
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-import java.util.concurrent.locks.ReentrantLock
-import kotlin.concurrent.withLock
+import java.util.concurrent.Executors
 
 /**
  * 触发链路计时日志：用于真机统计"通知出现 → 报警出声"的实际延迟。
@@ -21,9 +20,13 @@ import kotlin.concurrent.withLock
  *  - retrigger_during_alarm  报警仍响铃时又来一次触发，无新播放开始（备注同上；
  *                            暴露"防抖 < 响铃时长"的配置问题）
  *
- * 输出：logcat（Tag=TPAlert）+ 应用私有目录 trigger_timing.log（TSV，ISO 毫秒时间戳）。
- * 日志只记录时间戳、事件、包名与间隔毫秒，不记录通知正文内容。
- * 文件超过 1MB 时截断重开，避免无限增长。
+ * 设计约束：
+ *  - 写盘是异步的（单线程串行执行器），绝不阻塞调用线程——监听器/接收器主路径
+ *    不能被文件 I/O（含 1MB 轮转的删除+新建）拖慢，否则插桩本身会污染延迟数据。
+ *  - 延迟计算必须用单调时钟 SystemClock.elapsedRealtime()（调用方传入/计算），
+ *    墙钟时间只用于日志行的时间戳展示，避免 NTP/手动改时间造成负值或离谱间隔。
+ *  - 日志只记录时间戳、事件、包名与间隔毫秒，不记录通知正文内容。
+ *  - 文件超过 1MB 时截断重开，避免无限增长。
  */
 object TriggerLogger {
 
@@ -31,16 +34,21 @@ object TriggerLogger {
     private const val FILE_NAME = "trigger_timing.log"
     private const val MAX_LOG_BYTES = 1_000_000L
 
-    private val lock = ReentrantLock()
+    // 仅被单线程执行器使用，无并发问题。
     private val timeFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS", Locale.US)
 
-    fun log(context: Context, event: String, note: String) {
-        val line = "${timeFormat.format(Date())}\t$event\t$note"
-        Log.i(TAG, "$event: $note")
+    // 单线程串行写盘保证行序；daemon 线程避免阻止进程退出。
+    private val executor = Executors.newSingleThreadExecutor { r ->
+        Thread(r, "tpalert-logger").apply { isDaemon = true }
+    }
 
-        lock.withLock {
+    fun log(context: Context, event: String, note: String) {
+        Log.i(TAG, "$event: $note")
+        val appContext = context.applicationContext
+        executor.execute {
             try {
-                val file = File(context.filesDir, FILE_NAME)
+                val line = "${timeFormat.format(Date())}\t$event\t$note"
+                val file = File(appContext.filesDir, FILE_NAME)
                 if (file.exists() && file.length() > MAX_LOG_BYTES) {
                     // 简单轮转：超限则重开新文件，避免日志无限膨胀。
                     file.delete()

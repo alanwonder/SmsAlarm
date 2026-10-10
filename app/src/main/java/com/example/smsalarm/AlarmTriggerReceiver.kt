@@ -3,6 +3,7 @@ package com.example.smsalarm
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.os.SystemClock
 import androidx.core.content.ContextCompat
 
 /**
@@ -32,18 +33,19 @@ class AlarmTriggerReceiver : BroadcastReceiver() {
             return
         }
 
+        // 计时一律用单调时钟（elapsedRealtime），避免系统时间跳变污染间隔统计。
         val tReceive = intent.getLongExtra(EXTRA_T_RECEIVE, -1L)
-        val tTrigger = System.currentTimeMillis()
-        TriggerLogger.log(
-            context,
-            "trigger",
-            if (tReceive > 0) "from_receive=${tTrigger - tReceive}ms" else "from_receive=unknown"
-        )
+        val tTrigger = SystemClock.elapsedRealtime()
+        val note = if (tReceive > 0) "from_receive=${tTrigger - tReceive}ms" else "from_receive=unknown"
 
+        // 先启动服务，再记录日志：报警启动绝不能排在文件 I/O 后面
+        // （TriggerLogger 已异步写盘，这里再保持顺序作为双保险）。
         val serviceIntent = Intent(context, AlarmService::class.java).apply {
             putExtra(EXTRA_T_RECEIVE, tReceive)
             putExtra(EXTRA_T_TRIGGER, tTrigger)
         }
         ContextCompat.startForegroundService(context, serviceIntent)
+
+        TriggerLogger.log(context, "trigger", note)
     }
 }

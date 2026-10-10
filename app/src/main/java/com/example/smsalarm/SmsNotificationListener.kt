@@ -4,6 +4,7 @@ import android.app.AlarmManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.os.SystemClock
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import androidx.core.app.NotificationCompat
@@ -42,7 +43,8 @@ class SmsNotificationListener : NotificationListenerService() {
 
         sp.edit { putLong(KEY_LAST_TRIGGER, now) }
 
-        scheduleAlarm(now)
+        // 计时用单调时钟（elapsedRealtime），避免系统时间跳变污染延迟统计。
+        scheduleAlarm(SystemClock.elapsedRealtime())
     }
 
     /**
@@ -50,12 +52,13 @@ class SmsNotificationListener : NotificationListenerService() {
      * 这是后台回调，Android 12+ 会抛 ForegroundServiceStartNotAllowedException。
      * 改为用精确闹钟 setAlarmClock（无需 SCHEDULE_EXACT_ALARM 权限、Doze 下仍准点）
      * 中转，由 AlarmTriggerReceiver 在前台豁免场景下再拉起 AlarmService。
-     * tReceiveMs 随 PendingIntent extra 传递，供下游计算"通知→闹钟→播放"间隔。
+     * tReceiveElapsed 为单调时钟（SystemClock.elapsedRealtime()）毫秒值，
+     * 随 PendingIntent extra 传递，供下游计算"通知→闹钟→播放"间隔。
      */
-    private fun scheduleAlarm(tReceiveMs: Long) {
+    private fun scheduleAlarm(tReceiveElapsed: Long) {
         val am = getSystemService(Context.ALARM_SERVICE) as AlarmManager
         val intent = Intent(this, AlarmTriggerReceiver::class.java).apply {
-            putExtra(AlarmTriggerReceiver.EXTRA_T_RECEIVE, tReceiveMs)
+            putExtra(AlarmTriggerReceiver.EXTRA_T_RECEIVE, tReceiveElapsed)
         }
         val pi = PendingIntent.getBroadcast(
             this,
