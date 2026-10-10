@@ -29,6 +29,8 @@ class AlarmService : Service() {
     private var vibrator: Vibrator? = null
     private val handler = Handler(Looper.getMainLooper())
     private var isStopped = false
+    // 仅首次启动（onCreate 已真正出声）才记 play；已响铃期间再触发不重复记，避免污染计时数据。
+    private var playLogged = false
 
     // 报警前闹钟流的音量，用于报警结束后还原，避免永久把用户音量顶到最大。
     private var originalAlarmVolume = -1
@@ -55,7 +57,7 @@ class AlarmService : Service() {
             return START_NOT_STICKY
         }
 
-        // 报警链路计时：onCreate 里已经开始出声，此处时间戳与实际出声相差毫秒级。
+        // 报警链路计时：首次启动时 onCreate 里已经开始出声，此处时间戳与实际出声相差毫秒级。
         val tReceive = intent?.getLongExtra(AlarmTriggerReceiver.EXTRA_T_RECEIVE, -1L) ?: -1L
         val tTrigger = intent?.getLongExtra(AlarmTriggerReceiver.EXTRA_T_TRIGGER, -1L) ?: -1L
         val now = System.currentTimeMillis()
@@ -63,7 +65,16 @@ class AlarmService : Service() {
             if (tTrigger > 0) append("from_trigger=${now - tTrigger}ms;")
             if (tReceive > 0) append("from_receive=${now - tReceive}ms;")
         }
-        TriggerLogger.log(this, "play", note.ifEmpty { "timing=unknown" })
+
+        if (!playLogged) {
+            // 首次启动：播放确实在 onCreate 里开始，记录一次 play。
+            TriggerLogger.log(this, "play", note.ifEmpty { "timing=unknown" })
+            playLogged = true
+        } else {
+            // 报警仍在响铃时又触发了一次：没有新的播放开始。
+            // 单独立类（retrigger_during_alarm），避免把假样本混进 play 的延迟统计。
+            TriggerLogger.log(this, "retrigger_during_alarm", note.ifEmpty { "timing=unknown" })
+        }
 
         return START_NOT_STICKY
     }

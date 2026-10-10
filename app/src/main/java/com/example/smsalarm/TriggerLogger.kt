@@ -14,10 +14,12 @@ import kotlin.concurrent.withLock
  * 触发链路计时日志：用于真机统计"通知出现 → 报警出声"的实际延迟。
  *
  * 事件：
- *  - receive   监听器命中关键字（备注：来源包名）
- *  - debounce  防抖窗口内被丢弃（备注：距上次触发毫秒）
- *  - trigger   精确闹钟触发 AlarmTriggerReceiver（备注：距 receive 毫秒）
- *  - play      AlarmService 开始播放（备注：距 trigger / 距 receive 毫秒）
+ *  - receive             监听器命中关键字（备注：来源包名）
+ *  - debounce            防抖窗口内被丢弃（备注：距上次触发毫秒）
+ *  - trigger             精确闹钟触发 AlarmTriggerReceiver（备注：距 receive 毫秒）
+ *  - play                报警服务首次启动、真正开始播放（备注：距 trigger / 距 receive 毫秒）
+ *  - retrigger_during_alarm  报警仍响铃时又来一次触发，无新播放开始（备注同上；
+ *                            暴露"防抖 < 响铃时长"的配置问题）
  *
  * 输出：logcat（Tag=TPAlert）+ 应用私有目录 trigger_timing.log（TSV，ISO 毫秒时间戳）。
  * 日志只记录时间戳、事件、包名与间隔毫秒，不记录通知正文内容。
