@@ -30,6 +30,10 @@ class SmsNotificationListener : NotificationListenerService() {
         if (text.isNullOrBlank() || !text.contains("上海交警")) return
 
         val now = System.currentTimeMillis()
+        // 在 receive 事件时刻捕获计时起点：若推迟到 scheduleAlarm 处再取，
+        // 会把监听器自身处理（SP 冷加载/防抖计算/sp.edit 写盘）排挤到 from_receive 之外，
+        // 造成测量系统性偏小。此值一路传到 receiver/service 做间隔计算。
+        val tReceive = SystemClock.elapsedRealtime()
         TriggerLogger.log(this, "receive", "pkg=$pkg")
 
         val sp = getSharedPreferences(SP_NAME, Context.MODE_PRIVATE)
@@ -43,8 +47,7 @@ class SmsNotificationListener : NotificationListenerService() {
 
         sp.edit { putLong(KEY_LAST_TRIGGER, now) }
 
-        // 计时用单调时钟（elapsedRealtime），避免系统时间跳变污染延迟统计。
-        scheduleAlarm(SystemClock.elapsedRealtime())
+        scheduleAlarm(tReceive)
     }
 
     /**
