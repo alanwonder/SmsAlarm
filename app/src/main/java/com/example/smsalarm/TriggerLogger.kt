@@ -45,9 +45,13 @@ object TriggerLogger {
     fun log(context: Context, event: String, note: String) {
         Log.i(TAG, "$event: $note")
         val appContext = context.applicationContext
+        // 事件时刻的墙钟值必须在入队时捕获：若延迟到写盘线程求值，队列积压时
+        // 时间戳会滞后于真实事件时刻，展示时间错位。
+        val eventTimeMs = System.currentTimeMillis()
         executor.execute {
             try {
-                val line = "${timeFormat.format(Date())}\t$event\t$note"
+                // 格式化只在单线程执行器内进行，SimpleDateFormat 无并发问题。
+                val line = "${timeFormat.format(Date(eventTimeMs))}\t$event\t$note"
                 val file = File(appContext.filesDir, FILE_NAME)
                 if (file.exists() && file.length() > MAX_LOG_BYTES) {
                     // 简单轮转：超限则重开新文件，避免日志无限膨胀。
