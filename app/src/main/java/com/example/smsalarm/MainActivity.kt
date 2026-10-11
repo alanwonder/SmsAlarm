@@ -49,6 +49,7 @@ class MainActivity : AppCompatActivity() {
         val seekRingDuration = findViewById<SeekBar>(R.id.seekRingDuration)
         val tvDebounceValue = findViewById<TextView>(R.id.tvDebounceValue)
         val tvRingDurationValue = findViewById<TextView>(R.id.tvRingDurationValue)
+        val btnOpenLog = findViewById<Button>(R.id.btnOpenLog)
 
         updateText(btnToggle)
 
@@ -149,6 +150,11 @@ class MainActivity : AppCompatActivity() {
                 if (enabled) "监控已启用" else "监控已停止",
                 Toast.LENGTH_SHORT
             ).show()
+        }
+
+        // 应用内触发日志：不依赖 adb/电脑，手机上直接查看与清空。
+        btnOpenLog.setOnClickListener {
+            startActivity(Intent(this, AlarmLogActivity::class.java))
         }
     }
 

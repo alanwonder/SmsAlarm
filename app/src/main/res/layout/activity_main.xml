@@ -51,5 +51,12 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp" />
 
+        <Button
+            android:id="@+id/btnOpenLog"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:text="查看触发日志" />
+
     </LinearLayout>
 </ScrollView>
