@@ -4,6 +4,7 @@ import android.app.AlarmManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.os.SystemClock
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import androidx.core.app.NotificationCompat
@@ -28,18 +29,22 @@ class SmsNotificationListener : NotificationListenerService() {
         val text = extractNotificationText(sbn)
         if (text.isNullOrBlank() || !text.contains("上海交警")) return
 
+        val now = System.currentTimeMillis()
+        TriggerLogger.log(this, "receive", "pkg=$pkg")
+
         val sp = getSharedPreferences(SP_NAME, Context.MODE_PRIVATE)
         val last = sp.getLong(KEY_LAST_TRIGGER, 0L)
-        val now = System.currentTimeMillis()
         val debounceInterval = MonitorConfig.getDebounceMinutes(this) * 60 * 1000L
 
         if (now - last < debounceInterval) {
+            TriggerLogger.log(this, "debounce", "skip=${now - last}ms < window=${debounceInterval}ms")
             return
         }
 
         sp.edit { putLong(KEY_LAST_TRIGGER, now) }
 
-        scheduleAlarm()
+        // 计时用单调时钟（elapsedRealtime），避免系统时间跳变污染延迟统计。
+        scheduleAlarm(SystemClock.elapsedRealtime())
     }
 
     /**
@@ -47,13 +52,18 @@ class SmsNotificationListener : NotificationListenerService() {
      * 这是后台回调，Android 12+ 会抛 ForegroundServiceStartNotAllowedException。
      * 改为用精确闹钟 setAlarmClock（无需 SCHEDULE_EXACT_ALARM 权限、Doze 下仍准点）
      * 中转，由 AlarmTriggerReceiver 在前台豁免场景下再拉起 AlarmService。
+     * tReceiveElapsed 为单调时钟（SystemClock.elapsedRealtime()）毫秒值，
+     * 随 PendingIntent extra 传递，供下游计算"通知→闹钟→播放"间隔。
      */
-    private fun scheduleAlarm() {
+    private fun scheduleAlarm(tReceiveElapsed: Long) {
         val am = getSystemService(Context.ALARM_SERVICE) as AlarmManager
+        val intent = Intent(this, AlarmTriggerReceiver::class.java).apply {
+            putExtra(AlarmTriggerReceiver.EXTRA_T_RECEIVE, tReceiveElapsed)
+        }
         val pi = PendingIntent.getBroadcast(
             this,
             0,
-            Intent(this, AlarmTriggerReceiver::class.java),
+            intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
         am.setAlarmClock(
