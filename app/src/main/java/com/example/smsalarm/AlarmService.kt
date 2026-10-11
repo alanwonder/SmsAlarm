@@ -32,6 +32,9 @@ class AlarmService : Service() {
     private var isStopped = false
     // 仅首次启动（onCreate 已真正出声）才记 play；已响铃期间再触发不重复记，避免污染计时数据。
     private var playLogged = false
+    // mediaPlayer.start() 真正出声的单调时钟时刻；onStartCommand 晚于 onCreate，
+    // 慢设备上振动/配置工作会推后它，不能当作出声时刻。
+    private var playStartedElapsed = -1L
 
     // 报警前闹钟流的音量，用于报警结束后还原，避免永久把用户音量顶到最大。
     private var originalAlarmVolume = -1
@@ -58,23 +61,28 @@ class AlarmService : Service() {
             return START_NOT_STICKY
         }
 
-        // 报警链路计时：首次启动时 onCreate 里已经开始出声，此处时间戳与实际出声相差毫秒级。
-        // 计时用单调时钟（elapsedRealtime），与上游 extra 同源，避免墙钟跳变。
+        // 报警链路计时。真正的出声时刻在 playSound() 的 mediaPlayer.start() 处捕获
+        // （playStartedElapsed）；计时用单调时钟（elapsedRealtime），与上游 extra 同源。
         val tReceive = intent?.getLongExtra(AlarmTriggerReceiver.EXTRA_T_RECEIVE, -1L) ?: -1L
         val tTrigger = intent?.getLongExtra(AlarmTriggerReceiver.EXTRA_T_TRIGGER, -1L) ?: -1L
         val now = SystemClock.elapsedRealtime()
-        val note = buildString {
-            if (tTrigger > 0) append("from_trigger=${now - tTrigger}ms;")
-            if (tReceive > 0) append("from_receive=${now - tReceive}ms;")
-        }
 
         if (!playLogged) {
-            // 首次启动：播放确实在 onCreate 里开始，记录一次 play。
+            // 首次启动：用真正出声的时刻（start 处捕获），而不是 onStartCommand 时刻。
+            val startedAt = if (playStartedElapsed > 0) playStartedElapsed else now
+            val note = buildString {
+                if (tTrigger > 0) append("from_trigger=${startedAt - tTrigger}ms;")
+                if (tReceive > 0) append("from_receive=${startedAt - tReceive}ms;")
+            }
             TriggerLogger.log(this, "play", note.ifEmpty { "timing=unknown" })
             playLogged = true
         } else {
             // 报警仍在响铃时又触发了一次：没有新的播放开始。
             // 单独立类（retrigger_during_alarm），避免把假样本混进 play 的延迟统计。
+            val note = buildString {
+                if (tTrigger > 0) append("from_trigger=${now - tTrigger}ms;")
+                if (tReceive > 0) append("from_receive=${now - tReceive}ms;")
+            }
             TriggerLogger.log(this, "retrigger_during_alarm", note.ifEmpty { "timing=unknown" })
         }
 
@@ -93,6 +101,8 @@ class AlarmService : Service() {
             mediaPlayer = MediaPlayer.create(this, R.raw.alarm, audioAttributes, 0)
             mediaPlayer?.isLooping = true
             mediaPlayer?.start()
+            // 真正出声时刻（单调时钟），供 play 事件计时使用。
+            playStartedElapsed = SystemClock.elapsedRealtime()
         }
     }
 

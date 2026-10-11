@@ -3,6 +3,7 @@ package com.example.smsalarm
 import android.os.Bundle
 import android.widget.Button
 import android.widget.TextView
+import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 
@@ -70,8 +71,11 @@ class AlarmLogActivity : AppCompatActivity() {
             .setTitle("清空触发日志")
             .setMessage("确定删除全部触发计时记录？此操作不可恢复。")
             .setPositiveButton("清空") { _, _ ->
-                TriggerLogger.logFile(this).delete()
-                loadLog()
+                // 经由 TriggerLogger 同一单线程执行器删除，与排队中的写盘串行化，
+                // 避免已排队的写任务在清空后重建文件、复活旧记录。
+                TriggerLogger.clear(this)
+                render(emptyList())
+                Toast.makeText(this, "已清空", Toast.LENGTH_SHORT).show()
             }
             .setNegativeButton("取消", null)
             .show()

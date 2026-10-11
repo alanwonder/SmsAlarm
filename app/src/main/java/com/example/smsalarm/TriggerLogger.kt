@@ -66,4 +66,20 @@ object TriggerLogger {
 
     /** 日志文件路径，供调试时导出。 */
     fun logFile(context: Context): File = File(context.filesDir, FILE_NAME)
+
+    /**
+     * 清空日志文件：提交到同一单线程执行器，与排队中的写盘任务串行化——
+     * 清空动作排在所有已排队写盘之后执行，防止清空前排队的写任务
+     * 在删除后重建文件、复活旧记录。
+     */
+    fun clear(context: Context) {
+        val appContext = context.applicationContext
+        executor.execute {
+            try {
+                File(appContext.filesDir, FILE_NAME).delete()
+            } catch (t: Throwable) {
+                Log.w(TAG, "清空触发日志失败: ${t.message}")
+            }
+        }
+    }
 }
